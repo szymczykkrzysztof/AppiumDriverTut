@@ -21,14 +21,14 @@ steps:
 - powershell: dotnet build --configuration $(buildConfiguration) --no-restore
   displayName: 'dotnet build'
 
-# ─── 3. Testy ───────────────────────────────────────
+# ─── 3. Run tests ───────────────────────────────────────
 - powershell: |
     dotnet test --configuration $(buildConfiguration) --no-build `
       --logger "trx;LogFileName=results.trx" `
       --results-directory "$(testResultsDir)"
   displayName: 'Run tests'
 
-# ─── 4. Publikuj wyniki ─────────────────────────────
+# ─── 4. Publish results ─────────────────────────────
 - task: PublishTestResults@2
   displayName: 'Publish test results'
   condition: always()
@@ -38,9 +38,9 @@ steps:
     testRunTitle: 'WinAppDriver UI Tests'
     mergeTestResults: true
 
-# ─── 5. Publikuj artefakty ──────────────────────────
+# ─── 5. Publish artifacts ──────────────────────────
 - task: PublishBuildArtifacts@1
-  displayName: 'Publish artefacts'
+  displayName: 'Publish artifacts'
   condition: always()
   inputs:
     pathToPublish: '$(Build.ArtifactStagingDirectory)'
