@@ -1,5 +1,4 @@
 ﻿using System.Diagnostics;
-using AppiumDriverTut.Tests.Configration;
 using OpenQA.Selenium.Appium;
 using OpenQA.Selenium.Appium.Windows;
 
@@ -7,7 +6,7 @@ namespace AppiumDriverTut.Tests.Configuration;
 
 public abstract class AppTestBase
 {
-    protected WindowsDriver _driver;
+    protected WindowsDriver Driver;
     private Process _wadProcess;
     private Process _appiumProcess;
     protected abstract AppConfig GetAppConfig();
@@ -15,8 +14,6 @@ public abstract class AppTestBase
     [OneTimeSetUp]
     public void StartServers()
     {
-        var config = GetAppConfig();
-
         _wadProcess = new Process();
         _wadProcess.StartInfo = new ProcessStartInfo
         {
@@ -51,32 +48,32 @@ public abstract class AppTestBase
             App = config.AppPath
         };
 
-        _driver = new WindowsDriver(
+        Driver = new WindowsDriver(
             new Uri("http://127.0.0.1:4723"),
             options,
             TimeSpan.FromSeconds(config.DriverTimeoutSeconds));
 
-        _driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(5);
+        Driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(5);
     }
 
     [TearDown]
     public void Cleanup()
     {
-        _driver.Quit();
-        _driver.Dispose();
+        Driver.Quit();
+        Driver.Dispose();
     }
 
     [OneTimeTearDown]
     public void StopServers()
     {
-        _wadProcess?.Kill();
-        _appiumProcess?.Kill();
+        _wadProcess.Kill();
+        _appiumProcess.Kill();
 
         foreach (var p in Process.GetProcessesByName("WinAppDriver")) p.Kill();
         foreach (var p in Process.GetProcessesByName("node")) p.Kill();
 
-        _wadProcess?.Dispose();
-        _appiumProcess?.Dispose();
+        _wadProcess.Dispose();
+        _appiumProcess.Dispose();
     }
 
     private void WaitForPort(int port, string name, int timeoutSeconds = 30)

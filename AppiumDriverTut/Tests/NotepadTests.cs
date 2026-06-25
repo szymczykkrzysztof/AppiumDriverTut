@@ -1,8 +1,6 @@
-﻿using AppiumDriverTut.Tests.Configration;
+﻿
 using OpenQA.Selenium;
 using OpenQA.Selenium.Appium;
-using OpenQA.Selenium.Appium.Windows;
-using System.Diagnostics;
 using AppiumDriverTut.Tests.Configuration;
 
 namespace AppiumDriverTut.Tests
@@ -10,16 +8,13 @@ namespace AppiumDriverTut.Tests
     [TestFixture]
     public class NotepadTests:AppTestBase
     {
-        protected override AppConfig GetAppConfig() => new()
-        {
-            AppPath = @"C:\Windows\System32\notepad.exe",
-            DriverTimeoutSeconds = 60
-        };
+        protected override AppConfig GetAppConfig() => new(@"C:\Windows\System32\notepad.exe");
+        
 
         [Test]
         public void SendTextTest()
         {
-            var txtField = _driver.FindElement(
+            var txtField = Driver.FindElement(
                 MobileBy.ClassName("RichEditD2DPT"));
             txtField.SendKeys("Hello from Appium!");
             Assert.That(txtField.Text, Contains.Substring("Hello from Appium!"));
@@ -32,7 +27,7 @@ namespace AppiumDriverTut.Tests
         [Test]
         public void SendAnotherTextTest()
         {
-            var txtField = _driver.FindElement(
+            var txtField = Driver.FindElement(
                 MobileBy.ClassName("RichEditD2DPT"));
             txtField.SendKeys("Hello from Another Appium!");
             Assert.That(txtField.Text, Contains.Substring("Hello from Another Appium!"));
@@ -45,7 +40,7 @@ namespace AppiumDriverTut.Tests
         [Test]
         public void SendAnotherAnotherTextTest()
         {
-            var txtField = _driver.FindElement(
+            var txtField = Driver.FindElement(
                 MobileBy.ClassName("RichEditD2DPT"));
             txtField.SendKeys("Hello from Another Another Appium!");
             Assert.That(txtField.Text, Contains.Substring("Hello from Another Another Appium!"));
