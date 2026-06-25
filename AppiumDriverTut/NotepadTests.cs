@@ -11,7 +11,7 @@ namespace AppiumDriverTut
         private WindowsDriver _driver;
         private Process _wadProcess;
         private Process _appiumProcess;
-        
+
         [OneTimeSetUp]
         public void StartServers()
         {
@@ -20,8 +20,8 @@ namespace AppiumDriverTut
             {
                 FileName = @"C:\Program Files (x86)\Windows Application Driver\WinAppDriver.exe",
                 Arguments = "4724",
-                UseShellExecute = true,
-                Verb = "runas" 
+                UseShellExecute = true
+                // usunięte: Verb = "runas"
             };
             _wadProcess.Start();
 
@@ -33,9 +33,31 @@ namespace AppiumDriverTut
                 UseShellExecute = true
             };
             _appiumProcess.Start();
-            Thread.Sleep(5000);
 
+            WaitForPort(4724, "WinAppDriver");
+            WaitForPort(4723, "Appium");
         }
+
+        private void WaitForPort(int port, string name, int timeoutSeconds = 30)
+        {
+            var deadline = DateTime.Now.AddSeconds(timeoutSeconds);
+            while (DateTime.Now < deadline)
+            {
+                try
+                {
+                    using var client = new System.Net.Sockets.TcpClient();
+                    client.Connect("127.0.0.1", port);
+                    Console.WriteLine($"{name} ready on port {port}");
+                    return;
+                }
+                catch
+                {
+                    Thread.Sleep(500);
+                }
+            }
+            throw new Exception($"{name} did not start within {timeoutSeconds}s on port {port}");
+        }
+
         [SetUp]
         public void Setup()
         {
