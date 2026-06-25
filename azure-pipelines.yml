@@ -9,50 +9,32 @@ pool:
 
 variables:
   buildConfiguration: 'Release'
-  solutionPath: '**/*.slnx'
   testResultsDir: '$(Build.ArtifactStagingDirectory)\TestResults'
 
 steps:
 
-# ─── 1. Restore NuGet ───────────────────────────────
-- task: NuGetToolInstaller@1
-  displayName: 'Install NuGet'
-
-- task: NuGetCommand@2
-  displayName: 'NuGet Restore'
-  inputs:
-    restoreSolution: '$(solutionPath)'
+# ─── 1. Restore ─────────────────────────────────────
+- powershell: dotnet restore
+  displayName: 'dotnet restore'
 
 # ─── 2. Build ───────────────────────────────────────
-- task: VSBuild@1
-  displayName: 'Build Solution'
-  inputs:
-    solution: '$(solutionPath)'
-    configuration: '$(buildConfiguration)'
-    clean: true
+- powershell: dotnet build --configuration $(buildConfiguration) --no-restore
+  displayName: 'dotnet build'
 
-# ─── 3. Uruchom testy ───────────────────────────────
-- task: VSTest@2
+# ─── 3. Testy ───────────────────────────────────────
+- powershell: |
+    dotnet test --configuration $(buildConfiguration) --no-build `
+      --logger "trx;LogFileName=results.trx" `
+      --results-directory "$(testResultsDir)"
   displayName: 'Run tests'
-  inputs:
-    testSelector: 'testAssemblies'
-    testAssemblyVer2: |
-      **\*Tests*.dll
-      **\*Test*.dll
-      !**\obj\**
-    configuration: '$(buildConfiguration)'
-    runInParallel: false
-    codeCoverageEnabled: false
-    testRunTitle: 'WinAppDriver UI Tests'
-    resultsFolder: '$(testResultsDir)'
 
 # ─── 4. Publikuj wyniki ─────────────────────────────
 - task: PublishTestResults@2
-  displayName: 'Publish tests result'
+  displayName: 'Publish test results'
   condition: always()
   inputs:
     testResultsFormat: 'VSTest'
-    testResultsFiles: '$(testResultsDir)\**\*.trx'
+    testResultsFiles: '$(testResultsDir)\*.trx'
     testRunTitle: 'WinAppDriver UI Tests'
     mergeTestResults: true
 
