@@ -80,6 +80,19 @@ namespace AppiumDriverTut
             }
 
         }
+        [Test]
+        public void SendAnotherAnotherTextTest()
+        {
+            var txtField = _driver.FindElement(
+                MobileBy.ClassName("RichEditD2DPT"));
+            txtField.SendKeys("Hello from Another Another Appium!");
+            Assert.That(txtField.Text, Contains.Substring("Hello from Another Another Appium!"));
+            for (var i = 0; i < "Hello from Another Another Appium!".Length; i++)
+            {
+                txtField.SendKeys(Keys.Backspace);
+            }
+
+        }
 
         [TearDown]
         public void Cleanup()
