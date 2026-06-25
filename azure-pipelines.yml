@@ -4,44 +4,81 @@ trigger:
       - master
       - develop
 
-pool:
-  name: 'WinAppDriverPool'
-
 variables:
   buildConfiguration: 'Release'
   testResultsDir: '$(Build.ArtifactStagingDirectory)\TestResults'
+  resourceGroup: 'komy'
+  vmName: 'winappdrv'
 
-steps:
+jobs:
 
-# ─── 1. Restore ─────────────────────────────────────
-- powershell: dotnet restore
-  displayName: 'dotnet restore'
+# ─── JOB 1: Start VM ────────────────────────────────
+- job: StartVM
+  pool:
+    vmImage: 'ubuntu-latest'
+  steps:
+  - task: AzureCLI@2
+    displayName: 'Start VM'
+    inputs:
+      azureSubscription: 'AzureServiceConnection'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        echo "Starting VM..."
+        az vm start --resource-group $(resourceGroup) --name $(vmName)
+        az vm wait --resource-group $(resourceGroup) --name $(vmName) \
+          --custom "instanceView.statuses[?code=='PowerState/running']"
+        echo "Waiting for agent to come online..."
+        sleep 60
 
-# ─── 2. Build ───────────────────────────────────────
-- powershell: dotnet build --configuration $(buildConfiguration) --no-restore
-  displayName: 'dotnet build'
+# ─── JOB 2: Run tests ───────────────────────────────
+- job: RunTests
+  dependsOn: StartVM
+  pool:
+    name: 'WinAppDriverPool'
+  steps:
+  - powershell: dotnet restore
+    displayName: 'dotnet restore'
 
-# ─── 3. Run tests ───────────────────────────────────────
-- powershell: |
-    dotnet test --configuration $(buildConfiguration) --no-build `
-      --logger "trx;LogFileName=results.trx" `
-      --results-directory "$(testResultsDir)"
-  displayName: 'Run tests'
+  - powershell: dotnet build --configuration $(buildConfiguration) --no-restore
+    displayName: 'dotnet build'
 
-# ─── 4. Publish results ─────────────────────────────
-- task: PublishTestResults@2
-  displayName: 'Publish test results'
+  - powershell: |
+      dotnet test --configuration $(buildConfiguration) --no-build `
+        --logger "trx;LogFileName=results.trx" `
+        --results-directory "$(testResultsDir)"
+    displayName: 'Run tests'
+
+  - task: PublishTestResults@2
+    displayName: 'Publish test results'
+    condition: always()
+    inputs:
+      testResultsFormat: 'VSTest'
+      testResultsFiles: '$(testResultsDir)\*.trx'
+      testRunTitle: 'WinAppDriver UI Tests'
+      mergeTestResults: true
+
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish artifacts'
+    condition: always()
+    inputs:
+      pathToPublish: '$(Build.ArtifactStagingDirectory)'
+      artifactName: 'TestArtifacts'
+
+# ─── JOB 3: Stop VM ─────────────────────────────────
+- job: StopVM
+  dependsOn: RunTests
   condition: always()
-  inputs:
-    testResultsFormat: 'VSTest'
-    testResultsFiles: '$(testResultsDir)\*.trx'
-    testRunTitle: 'WinAppDriver UI Tests'
-    mergeTestResults: true
-
-# ─── 5. Publish artifacts ──────────────────────────
-- task: PublishBuildArtifacts@1
-  displayName: 'Publish artifacts'
-  condition: always()
-  inputs:
-    pathToPublish: '$(Build.ArtifactStagingDirectory)'
-    artifactName: 'TestArtifacts'
+  pool:
+    vmImage: 'ubuntu-latest'
+  steps:
+  - task: AzureCLI@2
+    displayName: 'Stop VM'
+    inputs:
+      azureSubscription: 'AzureServiceConnection'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        echo "Stopping VM..."
+        az vm deallocate --resource-group $(resourceGroup) --name $(vmName)
+        echo "VM stopped"
