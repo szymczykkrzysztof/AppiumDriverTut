@@ -1,0 +1,96 @@
+trigger:
+  branches:
+    include:
+      - master
+      - develop
+
+
+pool:
+  name: 'WinAppDriverPool'   
+
+variables:
+  buildConfiguration: 'Release'
+  solutionPath: '**/*.slnx'   # Dopasuj do struktury projektu
+  testResultsDir: '$(Build.ArtifactStagingDirectory)\TestResults'
+
+steps:
+
+# ─── 1. Restore NuGet ───────────────────────────────
+- task: NuGetToolInstaller@1
+  displayName: 'Zainstaluj NuGet'
+
+- task: NuGetCommand@2
+  displayName: 'NuGet Restore'
+  inputs:
+    restoreSolution: '$(solutionPath)'
+
+# ─── 2. Build ───────────────────────────────────────
+- task: VSBuild@1
+  displayName: 'Build Solution'
+  inputs:
+    solution: '$(solutionPath)'
+    configuration: '$(buildConfiguration)'
+    clean: true
+
+# ─── 3. Start WinAppDriver ──────────────────────────
+- powershell: |
+    # Zatrzymaj poprzednią instancję (jeśli była)
+    Stop-Process -Name WinAppDriver -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+
+    # Uruchom WinAppDriver w tle
+    $wad = Start-Process `
+      -FilePath 'C:\Program Files (x86)\Windows Application Driver\WinAppDriver.exe' `
+      -PassThru `
+      -WindowStyle Hidden
+
+    # Zapisz PID żeby zatrzymać po testach
+    Write-Host "WinAppDriver PID: $($wad.Id)"
+    echo $wad.Id | Out-File -FilePath '$(Agent.TempDirectory)\wad.pid'
+
+    # Poczekaj aż WinAppDriver będzie gotowy
+    Start-Sleep -Seconds 5
+    Write-Host "WinAppDriver uruchomiony"
+  displayName: 'Start WinAppDriver'
+
+# ─── 4. Uruchom testy ───────────────────────────────
+- task: VSTest@2
+  displayName: 'Uruchom testy WinAppDriver'
+  inputs:
+    testSelector: 'testAssemblies'
+    testAssemblyVer2: |
+      **\*Tests*.dll
+      **\*Test*.dll
+      !**\obj\**
+    configuration: '$(buildConfiguration)'
+    runInParallel: false          # UI testy MUSZĄ być sekwencyjne
+    codeCoverageEnabled: false
+    testRunTitle: 'WinAppDriver UI Tests'
+    resultsFolder: '$(testResultsDir)'
+  env:
+    WINAPPDRIVER_URL: 'http://127.0.0.1:4723'
+
+# ─── 5. Stop WinAppDriver ───────────────────────────
+- powershell: |
+    Stop-Process -Name WinAppDriver -ErrorAction SilentlyContinue
+    Write-Host "WinAppDriver zatrzymany"
+  displayName: 'Stop WinAppDriver'
+  condition: always()   # Zawsze zatrzymuj, nawet gdy testy padły
+
+# ─── 6. Publikuj wyniki ─────────────────────────────
+- task: PublishTestResults@2
+  displayName: 'Publikuj wyniki testów'
+  condition: always()
+  inputs:
+    testResultsFormat: 'VSTest'
+    testResultsFiles: '$(testResultsDir)\**\*.trx'
+    testRunTitle: 'WinAppDriver UI Tests'
+    mergeTestResults: true
+
+# ─── 7. Publikuj artefakty (logi, screenshoty) ──────
+- task: PublishBuildArtifacts@1
+  displayName: 'Publikuj artefakty'
+  condition: always()
+  inputs:
+    pathToPublish: '$(Build.ArtifactStagingDirectory)'
+    artifactName: 'TestArtifacts'
